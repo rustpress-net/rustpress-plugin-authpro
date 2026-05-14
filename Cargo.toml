@@ -3,9 +3,10 @@ name = "rustpress-auth"
 version = "1.0.0"
 edition = "2021"
 description = "Core authentication plugin for RustPress - JWT, password hashing, session management"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 authors = ["RustPress Team"]
-repository = "https://github.com/rustpress-net/rustpress-auth"
+repository = "https://github.com/rustpress-net/rustpress-plugin-authpro"
+readme = "README.md"
 keywords = ["authentication", "jwt", "rustpress", "plugin"]
 categories = ["authentication", "web-programming"]
 
