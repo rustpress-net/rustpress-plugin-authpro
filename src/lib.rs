@@ -40,6 +40,7 @@ pub mod extractors;
 pub mod handlers;
 pub mod middleware;
 pub mod models;
+pub mod rate_limit;
 pub mod service;
 
 // Re-export commonly used types
@@ -48,6 +49,7 @@ pub use error::AuthError;
 pub use extractors::{AuthUser, ClientInfo};
 pub use handlers::AuthState;
 pub use models::*;
+pub use rate_limit::{apply_auth_rate_limit, RateLimitConfig};
 pub use service::AuthService;
 
 use async_trait::async_trait;

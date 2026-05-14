@@ -196,8 +196,13 @@ impl AuthService {
         Ok(token_data.claims)
     }
 
-    /// Hash a token for secure storage
-    fn hash_token(&self, token: &str) -> String {
+    /// Hash a token for secure storage.
+    ///
+    /// Exposed (under `#[doc(hidden)]`) so the integration test suite can
+    /// verify that refresh / reset / verification tokens are stored as
+    /// hashes rather than plaintext, without needing a live database.
+    #[doc(hidden)]
+    pub fn hash_token(&self, token: &str) -> String {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
 

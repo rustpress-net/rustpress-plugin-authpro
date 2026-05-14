@@ -6,6 +6,7 @@ use crate::error::AuthError;
 use crate::extractors::{AuthUser, ClientInfo};
 use crate::middleware;
 use crate::models::*;
+use crate::rate_limit::{apply_auth_rate_limit, RateLimitConfig};
 use crate::service::AuthService;
 
 use axum::{
@@ -26,16 +27,42 @@ pub type AuthState = Arc<AuthService>;
 // Route Builder
 // ============================================
 
-/// Create authentication routes
+/// Create authentication routes with default (env-driven) rate-limit config.
+///
+/// Sensitive endpoints (`/auth/login`, `/auth/register`, `/auth/refresh`,
+/// `/auth/forgot-password`, `/auth/reset-password`) get a per-IP token-bucket
+/// limiter applied via `tower_governor`. Returns HTTP 429 with `Retry-After`
+/// when the budget is exhausted.
+///
+/// See [`crate::rate_limit::RateLimitConfig`] for tuning via env vars.
 pub fn create_routes(auth_service: Arc<AuthService>) -> Router {
-    // Public routes (no authentication required)
-    let public = Router::new()
+    create_routes_with_rate_limit(auth_service, RateLimitConfig::from_env())
+}
+
+/// Create authentication routes with an explicit rate-limit config.
+///
+/// Mostly useful for tests, where you want a deterministic limiter instead of
+/// the env-derived default.
+pub fn create_routes_with_rate_limit(
+    auth_service: Arc<AuthService>,
+    rate_cfg: RateLimitConfig,
+) -> Router {
+    // Sensitive public routes — credentials or token-exchange surface.
+    // These are the brute-force/abuse targets and get the rate limiter.
+    let limited = Router::new()
         .route("/auth/register", post(register))
         .route("/auth/login", post(login))
-        .route("/auth/logout", post(logout))
         .route("/auth/refresh", post(refresh_token))
         .route("/auth/forgot-password", post(forgot_password))
-        .route("/auth/reset-password", post(reset_password))
+        .route("/auth/reset-password", post(reset_password));
+
+    let limited = apply_auth_rate_limit(limited, rate_cfg);
+
+    // Public routes that aren't credential-bearing or are already
+    // authenticated by a token they carry — no need to rate-limit at
+    // the network edge here.
+    let public_unlimited = Router::new()
+        .route("/auth/logout", post(logout))
         .route("/auth/verify-email", post(verify_email));
 
     // Protected routes (require authentication)
@@ -46,7 +73,8 @@ pub fn create_routes(auth_service: Arc<AuthService>) -> Router {
         .layer(axum_middleware::from_fn(middleware::require_auth));
 
     Router::new()
-        .merge(public)
+        .merge(limited)
+        .merge(public_unlimited)
         .merge(protected)
         .with_state(auth_service)
 }
